@@ -31,6 +31,8 @@
 {
     AHKActionSheet *actionSheet = [[AHKActionSheet alloc] initWithTitle:NSLocalizedString(@"Lorem ipsum dolor sit amet, consectetur adipiscing elit?", nil)];
 
+    actionSheet.cellBackgroundColor = [UIColor orangeColor];
+    
     [actionSheet addButtonWithTitle:NSLocalizedString(@"Info", nil)
                               image:[UIImage imageNamed:@"Icon1"]
                                type:AHKActionSheetButtonTypeDefault

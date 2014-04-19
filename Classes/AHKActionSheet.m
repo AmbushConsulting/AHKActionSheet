@@ -47,6 +47,7 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
 @property (weak, nonatomic) UITableView *tableView;
 @property (weak, nonatomic) UIButton *cancelButton;
 @property (weak, nonatomic) UIView *cancelButtonShadowView;
+@property(nonatomic, strong) UIToolbar *toolbar;
 @end
 
 @implementation AHKActionSheet
@@ -83,6 +84,7 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
     if (self) {
         _title = title;
         _cancelButtonTitle = @"Cancel";
+        _cellBackgroundColor = [UIColor clearColor];
     }
 
     return self;
@@ -125,7 +127,7 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
     cell.imageView.image = [self.automaticallyTintButtonImages boolValue] ? [item.image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] : item.image;
     cell.imageView.tintColor = attributes[NSForegroundColorAttributeName] ? attributes[NSForegroundColorAttributeName] : [UIColor blackColor];
 
-    cell.backgroundColor = [UIColor clearColor];
+    cell.backgroundColor = self.cellBackgroundColor;
 
     if (self.selectedBackgroundColor && ![cell.selectedBackgroundView.backgroundColor isEqual:self.selectedBackgroundColor]) {
         cell.selectedBackgroundView = [[UIView alloc] init];
@@ -205,6 +207,8 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
     [self.items addObject:item];
 }
 
+
+
 - (void)show
 {
     NSAssert([self.items count] > 0, @"Please add some buttons before calling -show.");
@@ -219,12 +223,14 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
 
     [self setUpNewWindow];
     [self setUpBlurredBackgroundWithSnapshot:previousKeyWindowSnapshot];
+    [self setupCloseButton];
     [self setUpCancelButton];
     [self setUpTableView];
 
     // Animate sliding in tableView and cancel button with keyframe animation for a nicer effect.
     [UIView animateKeyframesWithDuration:kDefaultAnimationDuration delay:0 options:0 animations:^{
         self.blurredBackgroundView.alpha = 1.0f;
+        self.toolbar.alpha = 0.0f;
 
         [UIView addKeyframeWithRelativeStartTime:0.3f relativeDuration:0.7f animations:^{
             self.cancelButton.frame = CGRectMake(0,
@@ -232,6 +238,7 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
                                                  CGRectGetWidth(self.bounds),
                                                  self.cancelButtonHeight);
 
+            self.toolbar.alpha = 1.0f;
             // manual calculation of table's contentSize.height
             CGFloat tableContentHeight = [self.items count] * self.buttonHeight + CGRectGetHeight(self.tableView.tableHeaderView.frame);
 
@@ -266,9 +273,12 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
 
     void(^tearDownView)(void) = ^(void) {
         // remove the views because it's easiest to just recreate them if the action sheet is shown again
-        for (UIView *view in @[self.tableView, self.cancelButton, self.blurredBackgroundView, self.window]) {
+        for (UIView *view in @[self.tableView, self.blurredBackgroundView, self.window]) {
             [view removeFromSuperview];
         }
+
+        [self.cancelButton removeFromSuperview];
+        [self.toolbar removeFromSuperview];
 
         self.window = nil;
         [self.previousKeyWindow makeKeyAndVisible];
@@ -284,6 +294,7 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
             self.blurredBackgroundView.alpha = 0.0f;
             self.cancelButton.transform = CGAffineTransformTranslate(self.cancelButton.transform, 0, self.cancelButtonHeight);
             self.cancelButtonShadowView.alpha = 0.0f;
+            self.toolbar.alpha = 0.0f;
 
             // Shortest shift of position sufficient to hide all tableView contents below the bottom margin.
             // contentInset isn't used here (unlike in -show) because it caused weird problems with animations in some cases.
@@ -323,8 +334,25 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
     self.blurredBackgroundView = backgroundView;
 }
 
+- (void)setupCloseButton {
+    CGFloat y = [UIApplication sharedApplication].statusBarHidden ? 0 : [UIApplication sharedApplication].statusBarFrame.size.height;
+    self.toolbar = [[UIToolbar alloc] initWithFrame:CGRectMake(0, y, CGRectGetWidth(self.bounds), 44)];
+    self.toolbar.barStyle = -1;
+    self.toolbar.barTintColor = [UIColor clearColor];
+    UIBarButtonItem *closeButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemStop target:self action:@selector(cancelButtonTapped:)];
+    closeButton.tintColor = [UIColor blueColor];
+    self.toolbar.items = @[closeButton];
+
+    [self addSubview:self.toolbar];
+}
+
 - (void)setUpCancelButton
 {
+    if (![self.cancelAsSeparateButton boolValue]) {
+        return;
+    }
+
+
     UIButton *cancelButton = [UIButton buttonWithType:UIButtonTypeSystem];
     NSAttributedString *attrTitle = [[NSAttributedString alloc] initWithString:self.cancelButtonTitle
                                                                     attributes:self.cancelButtonTextAttributes];
@@ -358,10 +386,14 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
 {
     CGRect statusBarViewRect = [self convertRect:[UIApplication sharedApplication].statusBarFrame fromView:nil];
     CGFloat statusBarHeight = CGRectGetHeight(statusBarViewRect);
+
+    CGFloat height = CGRectGetHeight(self.bounds) - statusBarHeight;
+    height -= [self.cancelAsSeparateButton boolValue] ?  self.cancelButtonHeight : 0;
+
     CGRect frame = CGRectMake(0,
                               statusBarHeight,
                               CGRectGetWidth(self.bounds),
-                              CGRectGetHeight(self.bounds) - statusBarHeight - self.cancelButtonHeight);
+            height);
 
     UITableView *tableView = [[UITableView alloc] initWithFrame:frame];
     tableView.backgroundColor = [UIColor clearColor];
@@ -383,6 +415,8 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
     [self setUpTableViewHeader];
 }
 
+
+
 - (void)setUpTableViewHeader
 {
     if (self.title) {
@@ -403,6 +437,7 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
         // create and add a header consisting of the label
         UIView *headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(self.bounds), labelSize.height + 2*topBottomPadding)];
         [headerView addSubview:label];
+
         self.tableView.tableHeaderView = headerView;
 
     } else if (self.headerView) {

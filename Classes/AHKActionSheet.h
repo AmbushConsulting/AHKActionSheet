@@ -62,6 +62,12 @@ typedef void(^AHKActionSheetHandler)(AHKActionSheet *actionSheet);
 /// Window visible before the actionSheet was presented.
 @property (weak, nonatomic, readonly) UIWindow *previousKeyWindow;
 
+//Customized Values
+
+@property(nonatomic, strong) NSNumber *cancelAsSeparateButton;
+
+@property(nonatomic, strong) UIColor *cellBackgroundColor;
+
 // Designated initializer.
 - (instancetype)initWithTitle:(NSString *)title;
 - (void)addButtonWithTitle:(NSString *)title type:(AHKActionSheetButtonType)type handler:(AHKActionSheetHandler)handler;
