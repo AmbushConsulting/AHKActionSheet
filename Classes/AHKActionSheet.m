@@ -86,6 +86,8 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
         _cancelButtonTitle = @"Cancel";
         _cellBackgroundColor = [UIColor clearColor];
         _closeButtonTintColor = [UIColor blueColor];
+        _headerViewBackgroundColor = [UIColor darkGrayColor];
+        _labelTextAlignment = NSTextAlignmentLeft;
     }
 
     return self;
@@ -435,10 +437,13 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
         CGSize labelSize = [label sizeThatFits:CGSizeMake(labelWidth, MAXFLOAT)];
         label.frame = CGRectMake(leftRightPadding, topBottomPadding, labelWidth, labelSize.height);
 
+        label.textAlignment = self.labelTextAlignment;
+        
         // create and add a header consisting of the label
         UIView *headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(self.bounds), labelSize.height + 2*topBottomPadding)];
         [headerView addSubview:label];
 
+        headerView.backgroundColor = self.headerViewBackgroundColor;
         self.tableView.tableHeaderView = headerView;
 
     } else if (self.headerView) {

@@ -67,6 +67,8 @@ typedef void(^AHKActionSheetHandler)(AHKActionSheet *actionSheet);
 @property(nonatomic, strong) NSNumber *cancelAsSeparateButton;
 @property(nonatomic, strong) UIColor *cellBackgroundColor;
 @property(nonatomic, strong) UIColor *closeButtonTintColor;
+@property(nonatomic, strong) UIColor *headerViewBackgroundColor;
+@property(nonatomic) NSTextAlignment labelTextAlignment;
 
 // Designated initializer.
 - (instancetype)initWithTitle:(NSString *)title;
