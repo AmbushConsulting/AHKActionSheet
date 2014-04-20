@@ -20,3 +20,5 @@ DerivedData
 *.ipa
 Rakefile
 
+# AppCode
+**/.idea/

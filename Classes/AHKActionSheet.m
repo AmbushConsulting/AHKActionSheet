@@ -39,7 +39,7 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
 
 
 
-@interface AHKActionSheet() <UITableViewDataSource, UITableViewDelegate>
+@interface AHKActionSheet() <UITableViewDataSource, UITableViewDelegate, UIGestureRecognizerDelegate>
 @property (strong, nonatomic) NSMutableArray *items;
 @property (weak, nonatomic, readwrite) UIWindow *previousKeyWindow;
 @property (strong, nonatomic) UIWindow *window;
@@ -415,10 +415,17 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
 
     self.tableView = tableView;
 
+    UITapGestureRecognizer *tapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(cancelButtonTapped:)];
+    tapGestureRecognizer.delegate = self;
+    [self.tableView addGestureRecognizer:tapGestureRecognizer];
+
+
     [self setUpTableViewHeader];
 }
 
-
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
+    return ![NSStringFromClass(touch.view.class) isEqualToString:@"UITableViewCellContentView"];
+}
 
 - (void)setUpTableViewHeader
 {
