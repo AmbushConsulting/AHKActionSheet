@@ -85,6 +85,7 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
         _title = title;
         _cancelButtonTitle = @"Cancel";
         _cellBackgroundColor = [UIColor clearColor];
+        _closeButtonTintColor = [UIColor blueColor];
     }
 
     return self;
@@ -340,7 +341,7 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
     self.toolbar.barStyle = -1;
     self.toolbar.barTintColor = [UIColor clearColor];
     UIBarButtonItem *closeButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemStop target:self action:@selector(cancelButtonTapped:)];
-    closeButton.tintColor = [UIColor blueColor];
+    closeButton.tintColor = self.closeButtonTintColor;
     self.toolbar.items = @[closeButton];
 
     [self addSubview:self.toolbar];

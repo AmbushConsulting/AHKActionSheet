@@ -65,8 +65,8 @@ typedef void(^AHKActionSheetHandler)(AHKActionSheet *actionSheet);
 //Customized Values
 
 @property(nonatomic, strong) NSNumber *cancelAsSeparateButton;
-
 @property(nonatomic, strong) UIColor *cellBackgroundColor;
+@property(nonatomic, strong) UIColor *closeButtonTintColor;
 
 // Designated initializer.
 - (instancetype)initWithTitle:(NSString *)title;
