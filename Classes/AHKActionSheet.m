@@ -11,6 +11,7 @@
 #import "AHKActionSheetViewController.h"
 #import "UIView+Snapshots.h"
 #import "UIImage+AHKAdditions.h"
+#import "NSArray+Enumerable.h"
 
 
 static CGFloat const kDefaultAnimationDuration = 0.5f;
@@ -26,14 +27,6 @@ static CGFloat flickDownMinVelocity = 2000.0f;
 static CGFloat topSpaceMarginPercentage = 0.333f;
 
 
-/// Used for storing button configuration.
-@interface AHKActionSheetItem : NSObject
-@property (copy, nonatomic) NSString *title;
-@property (strong, nonatomic) UIImage *image;
-@property (nonatomic) AHKActionSheetButtonType type;
-@property (strong, nonatomic) AHKActionSheetHandler handler;
-@end
-
 @implementation AHKActionSheetItem
 @end
 
@@ -48,6 +41,7 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
 @property (weak, nonatomic) UIButton *cancelButton;
 @property (weak, nonatomic) UIView *cancelButtonShadowView;
 @property(nonatomic, strong) UIToolbar *toolbar;
+@property(nonatomic, strong) NSMutableArray *cellArray;
 @end
 
 @implementation AHKActionSheet
@@ -88,6 +82,23 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
         _closeButtonTintColor = [UIColor blueColor];
         _headerViewBackgroundColor = [UIColor darkGrayColor];
         _labelTextAlignment = NSTextAlignmentLeft;
+        _hidesAfterSelection = YES;
+    }
+
+    return self;
+}
+
+- (instancetype)initWithTitleAndDontDismiss:(NSString *)title{
+    self = [super init];
+
+    if (self) {
+        _title = title;
+        _cancelButtonTitle = @"Cancel";
+        _cellBackgroundColor = [UIColor clearColor];
+        _closeButtonTintColor = [UIColor blueColor];
+        _headerViewBackgroundColor = [UIColor darkGrayColor];
+        _labelTextAlignment = NSTextAlignmentLeft;
+        _hidesAfterSelection = NO;
     }
 
     return self;
@@ -131,10 +142,24 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
     cell.imageView.tintColor = attributes[NSForegroundColorAttributeName] ? attributes[NSForegroundColorAttributeName] : [UIColor blackColor];
 
     cell.backgroundColor = self.cellBackgroundColor;
-
-    if (self.selectedBackgroundColor && ![cell.selectedBackgroundView.backgroundColor isEqual:self.selectedBackgroundColor]) {
+    if(item.selectionStyle == UITableViewCellSelectionStyleNone){
+        cell.selectionStyle = item.selectionStyle;
+        self.selectedBackgroundColor = [UIColor clearColor];
+    }else if (self.selectedBackgroundColor && ![cell.selectedBackgroundView.backgroundColor isEqual:self.selectedBackgroundColor]) {
         cell.selectedBackgroundView = [[UIView alloc] init];
         cell.selectedBackgroundView.backgroundColor = self.selectedBackgroundColor;
+    }
+
+    if (item.type == AHKActionSheetButtonTypeUnselectable){
+        cell.selected = NO;
+    }
+
+    if(!self.cellArray){
+        self.cellArray = @[].mutableCopy;
+    }
+
+    if(![self.cellArray containsObject:cell]){
+        [self.cellArray insertObject:cell atIndex:indexPath.row];
     }
 
     return cell;
@@ -145,7 +170,19 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
     AHKActionSheetItem *item = self.items[indexPath.row];
-    [self dismissAnimated:YES duration:kDefaultAnimationDuration completion:item.handler];
+
+
+    UITableViewCell *cell = [self.cellArray objectAtIndex:indexPath.row];
+    if (item.type == AHKActionSheetButtonTypeUnselectable || item.alreadySelected){
+        cell.selected = NO;
+        return;
+    }
+
+    if(self.hidesAfterSelection){
+        [self dismissAnimated:YES duration:kDefaultAnimationDuration completion:item.handler];
+    }else{
+        item.clickHandler(item, cell);
+    }
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath
@@ -207,10 +244,69 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
     item.image = image;
     item.type = type;
     item.handler = handler;
+    item.selectionStyle = UITableViewCellSelectionStyleDefault;
     [self.items addObject:item];
 }
 
 
+- (void)addButtonWithTitle:(NSString *)title image:(UIImage *)image type:(enum AHKActionSheetButtonType)type postDoneHandler:(void (^) (AHKActionSheet *))handler clickHandler:(void (^) (AHKActionSheetItem *, UITableViewCell *))clickHandler setSelected:(BOOL)selected {
+    AHKActionSheetItem *item = [[AHKActionSheetItem alloc] init];
+    item.title = title;
+    item.image = image;
+    item.type = type;
+    item.postDoneHandler = handler;
+    item.selected = NO;
+    item.alreadySelected = selected;
+    item.clickHandler = clickHandler;
+    item.selectionStyle = UITableViewCellSelectionStyleNone;
+    [self.items addObject:item];
+}
+
+- (void)showWithFanciness:(UIView *)theView{
+    NSAssert([self.items count] > 0, @"Please add some buttons before calling -show.");
+
+    BOOL actionSheetIsVisible = !!self.window; // action sheet is visible iff it's associated with a window
+    if (actionSheetIsVisible) {
+        return;
+    }
+
+    self.previousKeyWindow = [UIApplication sharedApplication].keyWindow;
+    UIImage *previousKeyWindowSnapshot = [theView AHKsnapshotImage];
+
+    [self setUpNewWindow];
+    [self setUpBlurredBackgroundWithSnapshot:previousKeyWindowSnapshot];
+    [self setupCloseButton];
+    [self setUpCancelButton];
+    [self setUpTableView];
+
+    // Animate sliding in tableView and cancel button with keyframe animation for a nicer effect.
+    [UIView animateKeyframesWithDuration:kDefaultAnimationDuration delay:0 options:0 animations:^{
+        self.blurredBackgroundView.alpha = 1.0f;
+        self.toolbar.alpha = 0.0f;
+
+        [UIView addKeyframeWithRelativeStartTime:0.3f relativeDuration:0.7f animations:^{
+            self.cancelButton.frame = CGRectMake(0,
+                    CGRectGetMaxY(self.bounds) - self.cancelButtonHeight,
+                    CGRectGetWidth(self.bounds),
+                    self.cancelButtonHeight);
+
+            self.toolbar.alpha = 1.0f;
+            // manual calculation of table's contentSize.height
+            CGFloat tableContentHeight = [self.items count] * self.buttonHeight + CGRectGetHeight(self.tableView.tableHeaderView.frame);
+
+            CGFloat topInset;
+            BOOL buttonsFitInWithoutScrolling = tableContentHeight < CGRectGetHeight(self.tableView.frame) * (1.0 - topSpaceMarginPercentage);
+            if (buttonsFitInWithoutScrolling) {
+                // show all buttons if there isn't many
+                topInset = CGRectGetHeight(self.tableView.frame) - tableContentHeight;
+            } else {
+                // leave an empty space on the top to make the control look similar to UIActionSheet
+                topInset = round(CGRectGetHeight(self.tableView.frame) * topSpaceMarginPercentage);
+            }
+            self.tableView.contentInset = UIEdgeInsetsMake(topInset, 0, 0, 0);
+        }];
+    } completion:nil];
+}
 
 - (void)show
 {
@@ -319,6 +415,11 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
     self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
     self.window.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.window.opaque = NO;
+
+    if(self.hideStatusBar){
+        [[UIApplication sharedApplication] setStatusBarHidden:YES withAnimation:UIStatusBarAnimationNone];
+    }
+
     self.window.rootViewController = actionSheetVC;
     [self.window makeKeyAndVisible];
 }
@@ -444,8 +545,10 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
         CGSize labelSize = [label sizeThatFits:CGSizeMake(labelWidth, MAXFLOAT)];
         label.frame = CGRectMake(leftRightPadding, topBottomPadding, labelWidth, labelSize.height);
 
-        label.textAlignment = self.labelTextAlignment;
-        
+        if(![self.titleTextAttributes objectForKey:NSParagraphStyleAttributeName]){
+            label.textAlignment = self.labelTextAlignment;
+        }
+
         // create and add a header consisting of the label
         UIView *headerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(self.bounds), labelSize.height + 2*topBottomPadding)];
         [headerView addSubview:label];
@@ -455,6 +558,15 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
 
     } else if (self.headerView) {
         self.tableView.tableHeaderView = self.headerView;
+    }
+
+    if(!self.hidesAfterSelection){
+        UIButton *button = [[UIButton alloc] initWithFrame:CGRectMake(self.tableView.tableHeaderView.frame.size.width - 80, 0, 80, self.tableView.tableHeaderView.frame.size.height)];
+        [button setTitleColor:[UIColor colorWithRed:227/255.0f green:154/255.0f blue:119/255.0f alpha:1.0f] forState:UIControlStateNormal];
+        [button setTitle:@"Done" forState:UIControlStateNormal];
+        [self.tableView.tableHeaderView addSubview:button];
+
+        [button addTarget:self action:@selector(didClickDoneButton:) forControlEvents:UIControlEventTouchUpInside];
     }
 
     // add a separator between the tableHeaderView and a first row (technically at the bottom of the tableHeaderView)
@@ -470,6 +582,20 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
     }
 }
 
+- (void)didClickDoneButton:(id)sender {
+
+    NSArray *selectedArray = [self.items select:^BOOL(AHKActionSheetItem *item) {
+        return item.selected;
+    }];
+    if([selectedArray count] > 0){
+        [selectedArray each:^(AHKActionSheetItem *item) {
+            item.postDoneHandler(self);
+        }];
+    }
+    self.postDoneHandler(self);
+    [self dismissAnimated:YES duration:kDefaultAnimationDuration completion:nil];
+}
+
 - (void)fadeBlursOnScrollToTop
 {
     if (self.tableView.isDragging || self.tableView.isDecelerating) {
@@ -480,5 +606,4 @@ static CGFloat topSpaceMarginPercentage = 0.333f;
         self.cancelButtonShadowView.alpha = alpha;
     }
 }
-
 @end

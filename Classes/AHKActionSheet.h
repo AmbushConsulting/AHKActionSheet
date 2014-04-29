@@ -10,11 +10,27 @@
 
 typedef NS_ENUM(NSInteger, AHKActionSheetButtonType) {
     AHKActionSheetButtonTypeDefault = 0,
-    AHKActionSheetButtonTypeDestructive
+    AHKActionSheetButtonTypeDestructive,
+    AHKActionSheetButtonTypeUnselectable
 };
 
+
 @class AHKActionSheet;
+@class AHKActionSheetItem;
+
 typedef void(^AHKActionSheetHandler)(AHKActionSheet *actionSheet);
+
+@interface AHKActionSheetItem : NSObject
+@property (copy, nonatomic) NSString *title;
+@property (strong, nonatomic) UIImage *image;
+@property (nonatomic) BOOL selected;
+@property (nonatomic) BOOL alreadySelected;
+@property (nonatomic) AHKActionSheetButtonType type;
+@property (strong, nonatomic) AHKActionSheetHandler handler;
+@property(nonatomic, copy) void (^postDoneHandler)(AHKActionSheet *);
+@property(nonatomic, copy) void (^clickHandler)(AHKActionSheetItem *item, UITableViewCell *cell);
+@property(nonatomic) enum UITableViewCellSelectionStyle selectionStyle;
+@end
 
 
 @interface AHKActionSheet : UIView <UIAppearanceContainer>
@@ -62,6 +78,8 @@ typedef void(^AHKActionSheetHandler)(AHKActionSheet *actionSheet);
 /// Window visible before the actionSheet was presented.
 @property (weak, nonatomic, readonly) UIWindow *previousKeyWindow;
 
+@property (nonatomic) BOOL hidesAfterSelection;
+
 //Customized Values
 
 @property(nonatomic, strong) NSNumber *cancelAsSeparateButton;
@@ -70,11 +88,22 @@ typedef void(^AHKActionSheetHandler)(AHKActionSheet *actionSheet);
 @property(nonatomic, strong) UIColor *headerViewBackgroundColor;
 @property(nonatomic) NSTextAlignment labelTextAlignment;
 
+@property(nonatomic) BOOL hideStatusBar;
+
 // Designated initializer.
 - (instancetype)initWithTitle:(NSString *)title;
+
+- (instancetype)initWithTitleAndDontDismiss:(NSString *)title;
+
 - (void)addButtonWithTitle:(NSString *)title type:(AHKActionSheetButtonType)type handler:(AHKActionSheetHandler)handler;
 - (void)addButtonWithTitle:(NSString *)title image:(UIImage *)image type:(AHKActionSheetButtonType)type handler:(AHKActionSheetHandler)handler;
+
+- (void)showWithFanciness:(UIView *)theView;
+
 - (void)show;
 - (void)dismissAnimated:(BOOL)animated;
 
+- (void)addButtonWithTitle:(NSString *)topic image:(UIImage *)image type:(enum AHKActionSheetButtonType)type postDoneHandler:(void (^) (AHKActionSheet *))handler clickHandler:(void (^)(AHKActionSheetItem *, UITableViewCell *))clickHandler setSelected:(BOOL)selected;
+
+@property(nonatomic, copy) void (^postDoneHandler)(AHKActionSheet *item);
 @end
